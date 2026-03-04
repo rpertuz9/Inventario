@@ -19,7 +19,7 @@
     .s-blue{background:#e8f4fd}.s-green{background:#e8fdf0}.s-orange{background:#fdf3e8}.s-red{background:#fde8e8}
     .stat-label{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px}
     .stat-value{font-size:28px;font-weight:700;line-height:1;margin-top:3px}
-    .main-grid{display:grid;grid-template-columns:1fr 370px;gap:22px}
+    .main-grid{display:grid;grid-template-columns:1fr 400px;gap:22px}
     @media(max-width:900px){.main-grid{grid-template-columns:1fr}}
     .card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);overflow:hidden}
     .card-header{padding:18px 22px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
@@ -40,6 +40,8 @@
     .cat-bebidas td{background:#2980b9}
     .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
     .b-ok{background:#e8fdf0;color:#1a8a4a}.b-low{background:#fdf3e8;color:#b35e00}.b-empty{background:#fde8e8;color:#c0392b}
+
+    /* FORMULARIO */
     .form-panel{padding:22px}
     .form-panel h2{font-size:15px;font-weight:600;margin-bottom:18px}
     .type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
@@ -51,10 +53,29 @@
     .form-group label{display:block;font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
     .form-group select,.form-group input{width:100%;padding:10px 13px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:13.5px;outline:none;transition:border-color .2s;font-family:inherit;background:#fff}
     .form-group select:focus,.form-group input:focus{border-color:#0f3460}
-    .btn-submit{width:100%;padding:13px;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px}
+
+    /* BOTÓN AGREGAR AL CARRITO */
+    .btn-add{width:100%;padding:11px;border:2px dashed #0f3460;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px;background:#f0f6ff;color:#0f3460}
+    .btn-add:hover{background:#0f3460;color:#fff}
+
+    /* CARRITO */
+    .carrito-section{margin-top:16px;border-top:1px solid #f0f0f0;padding-top:16px}
+    .carrito-title{font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+    .carrito-empty{text-align:center;padding:16px;color:#bbb;font-size:13px;background:#fafafa;border-radius:10px}
+    .carrito-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8f9fc;border-radius:10px;margin-bottom:6px;font-size:13px}
+    .carrito-item .ci-nombre{flex:1;font-weight:500}
+    .carrito-item .ci-cant{background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:3px 8px;width:60px;font-size:13px;text-align:center;outline:none}
+    .carrito-item .ci-del{background:none;border:none;cursor:pointer;color:#e74c3c;font-size:16px;padding:2px 4px;border-radius:4px;transition:background .2s}
+    .carrito-item .ci-del:hover{background:#fde8e8}
+    .carrito-item.entrada-item{border-left:3px solid #1a8a4a}
+    .carrito-item.salida-item{border-left:3px solid #c0392b}
+
+    .btn-submit{width:100%;padding:13px;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:12px}
     .btn-submit.e{background:linear-gradient(135deg,#1a8a4a,#27ae60);color:#fff}
     .btn-submit.s{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff}
     .btn-submit:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+    .btn-submit:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
     .hist-section{margin-top:22px}
     .hist-header{padding:18px 22px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
     .hist-header h2{font-size:15px;font-weight:600}
@@ -76,9 +97,11 @@
     .tr{background:linear-gradient(135deg,#c0392b,#e74c3c)}
     .te{background:linear-gradient(135deg,#7d3c98,#9b59b6)}
     .td{background:#1a1a2e}
+    .carrito-count{background:#e94560;color:#fff;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700}
   </style>
 </head>
 <body>
+
 <header>
   <div class="logo">📦</div>
   <div>
@@ -86,6 +109,7 @@
     <p>Control de entradas y salidas · Comida · Cervezas · Bebidas/Gaseosas</p>
   </div>
 </header>
+
 <div class="container">
   <div class="upload-bar" onclick="document.getElementById('fileInput').click()">
     <div class="ui">📂</div>
@@ -93,12 +117,14 @@
     <p style="font-size:11px;color:#999;margin-top:4px">La app detecta automáticamente tus columnas y categorías</p>
   </div>
   <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="importExcel(event)"/>
+
   <div class="stats">
     <div class="stat-card"><div class="stat-icon s-blue">📦</div><div><div class="stat-label">Productos</div><div class="stat-value" id="sTotal">0</div></div></div>
     <div class="stat-card"><div class="stat-icon s-green">✅</div><div><div class="stat-label">Con Stock</div><div class="stat-value" id="sOk">0</div></div></div>
     <div class="stat-card"><div class="stat-icon s-orange">⚠️</div><div><div class="stat-label">Stock Bajo</div><div class="stat-value" id="sBajo">0</div></div></div>
     <div class="stat-card"><div class="stat-icon s-red">❌</div><div><div class="stat-label">Sin Stock</div><div class="stat-value" id="sVacio">0</div></div></div>
   </div>
+
   <div class="main-grid">
     <div class="card">
       <div class="card-header">
@@ -107,18 +133,31 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Producto</th><th>Inv. Inicial</th><th>Entradas</th><th>Salidas</th><th>Esperado</th><th>Físico</th><th>Dif</th><th>Estado</th></tr></thead>
+          <thead><tr>
+            <th>Producto</th><th>Inv. Inicial</th><th>Entradas</th><th>Salidas</th>
+            <th>Esperado</th><th>Físico</th><th>Dif</th><th>Estado</th>
+          </tr></thead>
           <tbody id="invBody"></tbody>
         </table>
       </div>
     </div>
+
+    <!-- FORMULARIO CON CARRITO -->
     <div class="card form-panel">
       <h2>🔄 Registrar Movimiento</h2>
+
       <div class="type-toggle">
         <button class="type-btn ae" id="btnE" onclick="setTipo('entrada')"><span class="ic">📥</span>Entrada</button>
         <button class="type-btn" id="btnS" onclick="setTipo('salida')"><span class="ic">📤</span>Salida</button>
       </div>
-      <div class="form-group"><label>Categoría</label>
+
+      <div class="form-group">
+        <label>Responsable</label>
+        <input type="text" id="inpResp" placeholder="Nombre de quien registra"/>
+      </div>
+
+      <div class="form-group">
+        <label>Categoría</label>
         <select id="selCat" onchange="filtrarProductos()">
           <option value="">— Todas las categorías —</option>
           <option value="COMIDA">🍖 Comida</option>
@@ -129,11 +168,23 @@
       <div class="form-group"><label>Producto</label><select id="selProd"></select></div>
       <div class="form-group"><label>Cantidad (Unidades)</label><input type="number" id="inpCant" placeholder="Ej: 10" min="1"/></div>
       <div class="form-group"><label>Físico actual (para DIF)</label><input type="number" id="inpFisico" placeholder="Cantidad contada físicamente" min="0"/></div>
-      <div class="form-group"><label>Responsable</label><input type="text" id="inpResp" placeholder="Nombre de quien registra"/></div>
       <div class="form-group"><label>Observación (opcional)</label><input type="text" id="inpObs" placeholder="Ej: Pedido #001, Devolución..."/></div>
-      <button class="btn-submit e" id="btnSubmit" onclick="registrar()">📥 Registrar Entrada</button>
+
+      <button class="btn-add" onclick="agregarAlCarrito()">➕ Agregar al carrito</button>
+
+      <!-- CARRITO -->
+      <div class="carrito-section">
+        <div class="carrito-title">
+          <span>🛒 Carrito <span class="carrito-count" id="carritoCount">0</span></span>
+          <span id="carritoTipo" style="font-size:11px;color:#aaa"></span>
+        </div>
+        <div id="carritoItems"><div class="carrito-empty">Agrega productos al carrito</div></div>
+      </div>
+
+      <button class="btn-submit e" id="btnSubmit" onclick="registrarTodo()" disabled>📥 Confirmar Entrada</button>
     </div>
   </div>
+
   <div class="card hist-section">
     <div class="hist-header">
       <h2>📜 Historial de Movimientos</h2>
@@ -141,19 +192,24 @@
     </div>
     <div class="hist-wrap">
       <table>
-        <thead><tr><th>Fecha y Hora</th><th>Tipo</th><th>Categoría</th><th>Producto</th><th>Cantidad</th><th>Inv. Inicial</th><th>Entradas Acum.</th><th>Salidas Acum.</th><th>Esperado</th><th>Físico</th><th>DIF</th><th>Responsable</th><th>Observación</th></tr></thead>
+        <thead><tr>
+          <th>Fecha y Hora</th><th>Tipo</th><th>Categoría</th><th>Producto</th>
+          <th>Cantidad</th><th>Inv. Inicial</th><th>Entradas Acum.</th><th>Salidas Acum.</th>
+          <th>Esperado</th><th>Físico</th><th>DIF</th><th>Responsable</th><th>Observación</th>
+        </tr></thead>
         <tbody id="histBody"></tbody>
       </table>
     </div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
+
 <script>
-let productos=[],historial=[],tipo='entrada';
+let productos=[], historial=[], tipo='entrada', carrito=[];
 
 function cargarDefecto(){
   productos=[
-    // COMIDA
     {nombre:'Panceta - de 700 gr',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Chorizo ó longaniza',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Pan hamburguesa',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
@@ -175,13 +231,11 @@ function cargarDefecto(){
     {nombre:'J1',                        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Pan para chuzopan',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Queso mozzarella',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    // CERVEZAS
     {nombre:'Aguila light',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Aguila negra',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Club Colombia',             categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Coronita',                  categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Poker',                     categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    // BEBIDAS/GASEOSAS
     {nombre:'Coca-Cola pet 400',         categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Postobon pet 400',          categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
     {nombre:'Mr Tea',                    categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
@@ -244,52 +298,174 @@ function importExcel(e){
 
 function setTipo(t){
   tipo=t;
+  carrito=[];
+  renderCarrito();
   document.getElementById('btnE').className='type-btn'+(t==='entrada'?' ae':'');
   document.getElementById('btnS').className='type-btn'+(t==='salida'?' as':'');
   const b=document.getElementById('btnSubmit');
-  b.textContent=t==='entrada'?'📥 Registrar Entrada':'📤 Registrar Salida';
+  b.textContent=t==='entrada'?'📥 Confirmar Entrada':'📤 Confirmar Salida';
   b.className='btn-submit '+(t==='entrada'?'e':'s');
+  b.disabled=true;
 }
 
 function filtrarProductos(){
   const cat=document.getElementById('selCat').value;
   const sel=document.getElementById('selProd');
-  const prev=sel.value;
   const lista=cat?productos.filter(p=>p.categoria===cat):productos;
   sel.innerHTML='<option value="">— Selecciona un producto —</option>'+
     lista.map(p=>`<option value="${p.nombre}">${p.nombre} (Esp: ${p.esperado})</option>`).join('');
-  if(prev)sel.value=prev;
 }
 
-function registrar(){
+// ── AGREGAR AL CARRITO ────────────────────────────────────────────────────────
+function agregarAlCarrito(){
   const prod=document.getElementById('selProd').value;
   const cant=parseInt(document.getElementById('inpCant').value);
   const fisV=document.getElementById('inpFisico').value;
-  const resp=document.getElementById('inpResp').value.trim();
   const obs=document.getElementById('inpObs').value.trim();
+
   if(!prod){showToast('⚠️ Selecciona un producto','te');return;}
   if(!cant||cant<1){showToast('⚠️ Ingresa una cantidad válida','te');return;}
-  if(!resp){showToast('⚠️ Ingresa el responsable','te');return;}
+
   const idx=productos.findIndex(p=>p.nombre===prod);
   if(idx===-1){showToast('❌ Producto no encontrado','te');return;}
   const p=productos[idx];
-  if(tipo==='salida'&&cant>p.esperado){showToast(`❌ Stock insuficiente (${p.esperado} uds disponibles)`,'te');return;}
-  if(tipo==='entrada')p.entradas+=cant;else p.salidas+=cant;
-  p.esperado=p.invInicial+p.entradas-p.salidas;
-  if(fisV!==''){p.fisico=parseInt(fisV)||0;p.dif=p.fisico-p.esperado;}
-  const ahora=new Date();
-  const fecha=ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'})
-    +' '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
-  historial.unshift({fecha,tipo:tipo==='entrada'?'ENTRADA':'SALIDA',
-    categoria:p.categoria,producto:p.nombre,cantidad:cant,
-    invInicial:p.invInicial,entradas:p.entradas,salidas:p.salidas,
-    esperado:p.esperado,fisico:p.fisico,dif:p.dif,
-    responsable:resp,obs:obs||'—'});
-  actualizarTodo();
+
+  if(tipo==='salida'&&cant>p.esperado){
+    showToast(`❌ Stock insuficiente (${p.esperado} uds disponibles)`,'te');return;
+  }
+
+  // Si ya está en el carrito, actualiza
+  const existing=carrito.findIndex(c=>c.nombre===prod);
+  if(existing>=0){
+    carrito[existing].cantidad=cant;
+    carrito[existing].fisico=fisV!==''?parseInt(fisV):null;
+    carrito[existing].obs=obs||'—';
+    showToast(`🔄 Actualizado: ${prod}`,'td');
+  } else {
+    carrito.push({
+      nombre:prod,
+      categoria:p.categoria,
+      cantidad:cant,
+      fisico:fisV!==''?parseInt(fisV):null,
+      obs:obs||'—'
+    });
+    showToast(`➕ Agregado: ${prod}`,'td');
+  }
+
+  // Limpiar campos de producto
+  document.getElementById('selProd').value='';
   document.getElementById('inpCant').value='';
   document.getElementById('inpFisico').value='';
   document.getElementById('inpObs').value='';
-  showToast(tipo==='entrada'?`✅ Entrada: +${cant} uds → ${prod}`:`✅ Salida: -${cant} uds → ${prod}`,tipo==='entrada'?'tg':'tr');
+
+  renderCarrito();
+}
+
+// ── RENDER CARRITO ────────────────────────────────────────────────────────────
+function renderCarrito(){
+  const cont=document.getElementById('carritoItems');
+  const count=document.getElementById('carritoCount');
+  const btnSubmit=document.getElementById('btnSubmit');
+  const tipoLabel=document.getElementById('carritoTipo');
+
+  count.textContent=carrito.length;
+  tipoLabel.textContent=carrito.length>0?(tipo==='entrada'?'📥 ENTRADAS':'📤 SALIDAS'):'';
+
+  if(carrito.length===0){
+    cont.innerHTML='<div class="carrito-empty">Agrega productos al carrito</div>';
+    btnSubmit.disabled=true;
+    return;
+  }
+
+  cont.innerHTML=carrito.map((item,i)=>`
+    <div class="carrito-item ${tipo}-item">
+      <span class="ci-nombre">${item.nombre}</span>
+      <input class="ci-cant" type="number" value="${item.cantidad}" min="1"
+        onchange="actualizarCantCarrito(${i}, this.value)"/>
+      <button class="ci-del" onclick="eliminarDelCarrito(${i})">✕</button>
+    </div>
+  `).join('');
+
+  btnSubmit.disabled=false;
+  btnSubmit.textContent=tipo==='entrada'
+    ?`📥 Confirmar Entrada (${carrito.length} producto${carrito.length>1?'s':''})`
+    :`📤 Confirmar Salida (${carrito.length} producto${carrito.length>1?'s':''})`;
+}
+
+function actualizarCantCarrito(i, val){
+  const cant=parseInt(val);
+  if(cant>0) carrito[i].cantidad=cant;
+}
+
+function eliminarDelCarrito(i){
+  const nombre=carrito[i].nombre;
+  carrito.splice(i,1);
+  renderCarrito();
+  showToast(`🗑️ Eliminado: ${nombre}`,'td');
+}
+
+// ── CONFIRMAR TODO EL CARRITO ─────────────────────────────────────────────────
+function registrarTodo(){
+  const resp=document.getElementById('inpResp').value.trim();
+  if(!resp){showToast('⚠️ Ingresa el nombre del responsable','te');return;}
+  if(carrito.length===0){showToast('⚠️ El carrito está vacío','te');return;}
+
+  const ahora=new Date();
+  const fecha=ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'})
+    +' '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+
+  let errores=[];
+
+  carrito.forEach(item=>{
+    const idx=productos.findIndex(p=>p.nombre===item.nombre);
+    if(idx===-1){errores.push(item.nombre);return;}
+    const p=productos[idx];
+
+    if(tipo==='salida'&&item.cantidad>p.esperado){
+      errores.push(`${item.nombre} (sin stock suficiente)`);return;
+    }
+
+    if(tipo==='entrada') p.entradas+=item.cantidad;
+    else                 p.salidas+=item.cantidad;
+    p.esperado=p.invInicial+p.entradas-p.salidas;
+
+    if(item.fisico!==null){
+      p.fisico=item.fisico;
+      p.dif=p.fisico-p.esperado;
+    }
+
+    historial.unshift({
+      fecha,
+      tipo:tipo==='entrada'?'ENTRADA':'SALIDA',
+      categoria:p.categoria,
+      producto:p.nombre,
+      cantidad:item.cantidad,
+      invInicial:p.invInicial,
+      entradas:p.entradas,
+      salidas:p.salidas,
+      esperado:p.esperado,
+      fisico:p.fisico,
+      dif:p.dif,
+      responsable:resp,
+      obs:item.obs
+    });
+  });
+
+  if(errores.length>0){
+    showToast(`⚠️ Algunos productos no se procesaron: ${errores.join(', ')}`, 'te');
+  } else {
+    const n=carrito.length;
+    showToast(
+      tipo==='entrada'
+        ?`✅ Entrada confirmada: ${n} producto${n>1?'s':''} registrado${n>1?'s':''}`
+        :`✅ Salida confirmada: ${n} producto${n>1?'s':''} registrado${n>1?'s':''}`,
+      tipo==='entrada'?'tg':'tr'
+    );
+  }
+
+  carrito=[];
+  renderCarrito();
+  actualizarTodo();
 }
 
 function renderTable(){
