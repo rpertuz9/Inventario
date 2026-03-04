@@ -79,6 +79,7 @@
   </style>
 </head>
 <body>
+
 <header>
   <div class="logo">📦</div>
   <div>
@@ -86,6 +87,7 @@
     <p>Control de entradas y salidas · Comida · Cervezas · Bebidas/Gaseosas</p>
   </div>
 </header>
+
 <div class="container">
   <div class="upload-bar" onclick="document.getElementById('fileInput').click()">
     <div class="ui">📂</div>
@@ -93,12 +95,14 @@
     <p style="font-size:11px;color:#999;margin-top:4px">La app detecta automáticamente tus columnas y categorías</p>
   </div>
   <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="importExcel(event)"/>
+
   <div class="stats">
     <div class="stat-card"><div class="stat-icon s-blue">📦</div><div><div class="stat-label">Productos</div><div class="stat-value" id="sTotal">0</div></div></div>
     <div class="stat-card"><div class="stat-icon s-green">✅</div><div><div class="stat-label">Con Stock</div><div class="stat-value" id="sOk">0</div></div></div>
     <div class="stat-card"><div class="stat-icon s-orange">⚠️</div><div><div class="stat-label">Stock Bajo</div><div class="stat-value" id="sBajo">0</div></div></div>
     <div class="stat-card"><div class="stat-icon s-red">❌</div><div><div class="stat-label">Sin Stock</div><div class="stat-value" id="sVacio">0</div></div></div>
   </div>
+
   <div class="main-grid">
     <div class="card">
       <div class="card-header">
@@ -107,18 +111,23 @@
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Producto</th><th>Inv. Inicial</th><th>Entradas</th><th>Salidas</th><th>Esperado</th><th>Físico</th><th>Dif</th><th>Estado</th></tr></thead>
+          <thead><tr>
+            <th>Producto</th><th>Inv. Inicial</th><th>Entradas</th><th>Salidas</th>
+            <th>Esperado</th><th>Físico</th><th>Dif</th><th>Estado</th>
+          </tr></thead>
           <tbody id="invBody"></tbody>
         </table>
       </div>
     </div>
+
     <div class="card form-panel">
       <h2>🔄 Registrar Movimiento</h2>
       <div class="type-toggle">
         <button class="type-btn ae" id="btnE" onclick="setTipo('entrada')"><span class="ic">📥</span>Entrada</button>
         <button class="type-btn" id="btnS" onclick="setTipo('salida')"><span class="ic">📤</span>Salida</button>
       </div>
-      <div class="form-group"><label>Categoría</label>
+      <div class="form-group">
+        <label>Categoría</label>
         <select id="selCat" onchange="filtrarProductos()">
           <option value="">— Todas las categorías —</option>
           <option value="COMIDA">🍖 Comida</option>
@@ -134,6 +143,7 @@
       <button class="btn-submit e" id="btnSubmit" onclick="registrar()">📥 Registrar Entrada</button>
     </div>
   </div>
+
   <div class="card hist-section">
     <div class="hist-header">
       <h2>📜 Historial de Movimientos</h2>
@@ -141,15 +151,21 @@
     </div>
     <div class="hist-wrap">
       <table>
-        <thead><tr><th>Fecha y Hora</th><th>Tipo</th><th>Categoría</th><th>Producto</th><th>Cantidad</th><th>Inv. Inicial</th><th>Entradas Acum.</th><th>Salidas Acum.</th><th>Esperado</th><th>Físico</th><th>DIF</th><th>Responsable</th><th>Observación</th></tr></thead>
+        <thead><tr>
+          <th>Fecha y Hora</th><th>Tipo</th><th>Categoría</th><th>Producto</th>
+          <th>Cantidad</th><th>Inv. Inicial</th><th>Entradas Acum.</th><th>Salidas Acum.</th>
+          <th>Esperado</th><th>Físico</th><th>DIF</th><th>Responsable</th><th>Observación</th>
+        </tr></thead>
         <tbody id="histBody"></tbody>
       </table>
     </div>
   </div>
 </div>
+
 <div class="toast" id="toast"></div>
+
 <script>
-let productos=[],historial=[],tipo='entrada';
+let productos=[], historial=[], tipo='entrada';
 
 function cargarDefecto(){
   productos=[
