@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sistema de Inventario</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+    header{background:linear-gradient(135deg,#1a1a2e,#0f3460);color:#fff;padding:18px 32px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+    .logo{width:44px;height:44px;background:#e94560;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px}
+    header h1{font-size:21px;font-weight:700}
+    header p{font-size:12px;opacity:.6;margin-top:2px}
+    .container{max-width:1300px;margin:0 auto;padding:26px 20px}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:26px}
+    .stat-card{background:#fff;border-radius:14px;padding:18px;box-shadow:0 2px 12px rgba(0,0,0,.06);display:flex;align-items:center;gap:12px}
+    .stat-icon{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:21px}
+    .s-blue{background:#e8f4fd}.s-green{background:#e8fdf0}.s-orange{background:#fdf3e8}.s-red{background:#fde8e8}
+    .stat-label{font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px}
+    .stat-value{font-size:28px;font-weight:700;line-height:1;margin-top:3px}
+    .main-grid{display:grid;grid-template-columns:1fr 370px;gap:22px}
+    @media(max-width:900px){.main-grid{grid-template-columns:1fr}}
+    .card{background:#fff;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);overflow:hidden}
+    .card-header{padding:18px 22px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+    .card-header h2{font-size:15px;font-weight:600}
+    .search-box{position:relative}
+    .search-box::before{content:'🔍';position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px}
+    .search-box input{padding:8px 12px 8px 32px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:13px;outline:none;width:210px;transition:border-color .2s}
+    .search-box input:focus{border-color:#0f3460}
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:13.5px}
+    thead th{background:#f8f9fc;padding:11px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#888;border-bottom:1px solid #eee;white-space:nowrap}
+    tbody tr{border-bottom:1px solid #f5f5f5;transition:background .15s}
+    tbody tr:hover{background:#fafbff}
+    tbody td{padding:11px 14px;vertical-align:middle}
+    .cat-row td{font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:#fff;padding:8px 14px}
+    .cat-comida td{background:#c0392b}
+    .cat-cervezas td{background:#e67e22}
+    .cat-bebidas td{background:#2980b9}
+    .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+    .b-ok{background:#e8fdf0;color:#1a8a4a}.b-low{background:#fdf3e8;color:#b35e00}.b-empty{background:#fde8e8;color:#c0392b}
+    .form-panel{padding:22px}
+    .form-panel h2{font-size:15px;font-weight:600;margin-bottom:18px}
+    .type-toggle{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+    .type-btn{padding:13px;border:2px solid #e0e0e0;border-radius:12px;background:#fff;cursor:pointer;text-align:center;font-size:13px;font-weight:600;transition:all .2s}
+    .type-btn .ic{font-size:22px;display:block;margin-bottom:3px}
+    .type-btn.ae{border-color:#1a8a4a;background:#e8fdf0;color:#1a8a4a}
+    .type-btn.as{border-color:#c0392b;background:#fde8e8;color:#c0392b}
+    .form-group{margin-bottom:14px}
+    .form-group label{display:block;font-size:11px;font-weight:700;color:#666;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+    .form-group select,.form-group input{width:100%;padding:10px 13px;border:1.5px solid #e0e0e0;border-radius:10px;font-size:13.5px;outline:none;transition:border-color .2s;font-family:inherit;background:#fff}
+    .form-group select:focus,.form-group input:focus{border-color:#0f3460}
+    .btn-submit{width:100%;padding:13px;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px}
+    .btn-submit.e{background:linear-gradient(135deg,#1a8a4a,#27ae60);color:#fff}
+    .btn-submit.s{background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff}
+    .btn-submit:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+    .hist-section{margin-top:22px}
+    .hist-header{padding:18px 22px 14px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+    .hist-header h2{font-size:15px;font-weight:600}
+    .btn-dl{padding:9px 16px;background:linear-gradient(135deg,#0f3460,#1a5276);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:6px}
+    .btn-dl:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(15,52,96,.35)}
+    .hist-wrap{overflow-x:auto;max-height:340px;overflow-y:auto}
+    .hist-wrap table thead th{position:sticky;top:0;z-index:1}
+    .t-entrada{color:#1a8a4a;font-weight:700}.t-salida{color:#c0392b;font-weight:700}
+    .empty-row td{text-align:center;padding:30px;color:#bbb;font-size:13px}
+    .upload-bar{background:linear-gradient(135deg,#e8f4fd,#f0e8fd);border:2px dashed #a0b4d0;border-radius:14px;padding:20px;text-align:center;margin-bottom:22px;cursor:pointer;transition:all .2s}
+    .upload-bar:hover{border-color:#0f3460;background:#e0eeff}
+    .upload-bar .ui{font-size:32px;margin-bottom:6px}
+    .upload-bar p{font-size:13px;color:#555}
+    .upload-bar strong{color:#0f3460}
+    #fileInput{display:none}
+    .toast{position:fixed;bottom:26px;right:26px;color:#fff;padding:13px 20px;border-radius:12px;font-size:13.5px;font-weight:500;box-shadow:0 8px 30px rgba(0,0,0,.25);transform:translateY(80px);opacity:0;transition:all .3s;z-index:1000}
+    .toast.show{transform:translateY(0);opacity:1}
+    .tg{background:linear-gradient(135deg,#1a8a4a,#27ae60)}
+    .tr{background:linear-gradient(135deg,#c0392b,#e74c3c)}
+    .te{background:linear-gradient(135deg,#7d3c98,#9b59b6)}
+    .td{background:#1a1a2e}
+  </style>
+</head>
+<body>
+<header>
+  <div class="logo">📦</div>
+  <div>
+    <h1>Sistema de Inventario</h1>
+    <p>Control de entradas y salidas · Comida · Cervezas · Bebidas/Gaseosas</p>
+  </div>
+</header>
+<div class="container">
+  <div class="upload-bar" onclick="document.getElementById('fileInput').click()">
+    <div class="ui">📂</div>
+    <p><strong>Cargar Excel existente</strong> — Haz clic para importar tu archivo Prueba.xlsx</p>
+    <p style="font-size:11px;color:#999;margin-top:4px">La app detecta automáticamente tus columnas y categorías</p>
+  </div>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="importExcel(event)"/>
+  <div class="stats">
+    <div class="stat-card"><div class="stat-icon s-blue">📦</div><div><div class="stat-label">Productos</div><div class="stat-value" id="sTotal">0</div></div></div>
+    <div class="stat-card"><div class="stat-icon s-green">✅</div><div><div class="stat-label">Con Stock</div><div class="stat-value" id="sOk">0</div></div></div>
+    <div class="stat-card"><div class="stat-icon s-orange">⚠️</div><div><div class="stat-label">Stock Bajo</div><div class="stat-value" id="sBajo">0</div></div></div>
+    <div class="stat-card"><div class="stat-icon s-red">❌</div><div><div class="stat-label">Sin Stock</div><div class="stat-value" id="sVacio">0</div></div></div>
+  </div>
+  <div class="main-grid">
+    <div class="card">
+      <div class="card-header">
+        <h2>📋 Inventario Actual</h2>
+        <div class="search-box"><input type="text" id="searchInput" placeholder="Buscar producto..." oninput="renderTable()"/></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Producto</th><th>Inv. Inicial</th><th>Entradas</th><th>Salidas</th><th>Esperado</th><th>Físico</th><th>Dif</th><th>Estado</th></tr></thead>
+          <tbody id="invBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card form-panel">
+      <h2>🔄 Registrar Movimiento</h2>
+      <div class="type-toggle">
+        <button class="type-btn ae" id="btnE" onclick="setTipo('entrada')"><span class="ic">📥</span>Entrada</button>
+        <button class="type-btn" id="btnS" onclick="setTipo('salida')"><span class="ic">📤</span>Salida</button>
+      </div>
+      <div class="form-group"><label>Categoría</label>
+        <select id="selCat" onchange="filtrarProductos()">
+          <option value="">— Todas las categorías —</option>
+          <option value="COMIDA">🍖 Comida</option>
+          <option value="CERVEZAS">🍺 Cervezas</option>
+          <option value="BEBIDAS">🥤 Bebidas/Gaseosas</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Producto</label><select id="selProd"></select></div>
+      <div class="form-group"><label>Cantidad (Unidades)</label><input type="number" id="inpCant" placeholder="Ej: 10" min="1"/></div>
+      <div class="form-group"><label>Físico actual (para DIF)</label><input type="number" id="inpFisico" placeholder="Cantidad contada físicamente" min="0"/></div>
+      <div class="form-group"><label>Responsable</label><input type="text" id="inpResp" placeholder="Nombre de quien registra"/></div>
+      <div class="form-group"><label>Observación (opcional)</label><input type="text" id="inpObs" placeholder="Ej: Pedido #001, Devolución..."/></div>
+      <button class="btn-submit e" id="btnSubmit" onclick="registrar()">📥 Registrar Entrada</button>
+    </div>
+  </div>
+  <div class="card hist-section">
+    <div class="hist-header">
+      <h2>📜 Historial de Movimientos</h2>
+      <button class="btn-dl" onclick="exportarExcel()">⬇️ Descargar Excel</button>
+    </div>
+    <div class="hist-wrap">
+      <table>
+        <thead><tr><th>Fecha y Hora</th><th>Tipo</th><th>Categoría</th><th>Producto</th><th>Cantidad</th><th>Inv. Inicial</th><th>Entradas Acum.</th><th>Salidas Acum.</th><th>Esperado</th><th>Físico</th><th>DIF</th><th>Responsable</th><th>Observación</th></tr></thead>
+        <tbody id="histBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+let productos=[],historial=[],tipo='entrada';
+
+function cargarDefecto(){
+  productos=[
+    // COMIDA
+    {nombre:'Panceta - de 700 gr',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Chorizo ó longaniza',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Pan hamburguesa',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Bollos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Arepas',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Costilla de cerdo',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Lomo de cerdo',             categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Pechuga',                   categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Punta gorda - Carne',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Chinchurria',               categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Costilla para caldo',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Papa francesa salchipapa',  categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Papa francesa hamburguesa', categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Doritos pequeños',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Doritos grandes',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Huevos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Salchichas cazadoras',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Tortillas de tacos',        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'J1',                        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Pan para chuzopan',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Queso mozzarella',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    // CERVEZAS
+    {nombre:'Aguila light',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Aguila negra',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Club Colombia',             categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Coronita',                  categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Poker',                     categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    // BEBIDAS/GASEOSAS
+    {nombre:'Coca-Cola pet 400',         categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Postobon pet 400',          categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Mr Tea',                    categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Te Hatsu',                  categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Soda Hatsu',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Soda bretaña',              categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Canada Dry',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Agua',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Jugos naturales',           categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Porciones de cereza',       categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Porciones de limón',        categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Milo',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Café Americano',            categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Capuccino',                 categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+  ];
+  actualizarTodo();
+  showToast('📦 Inventario cargado con todos los productos.','td');
+}
+
+function importExcel(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const wb=XLSX.read(ev.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:'',header:1});
+      let headerIdx=0;
+      for(let i=0;i<Math.min(rows.length,6);i++){
+        if(rows[i].map(c=>String(c).toUpperCase()).some(c=>c.includes('PRODUCT'))){headerIdx=i;break;}
+      }
+      const headers=rows[headerIdx].map(c=>String(c).toUpperCase().trim());
+      const iN=headers.findIndex(h=>h.includes('PRODUCT'));
+      const iI=headers.findIndex(h=>h.includes('INIC'));
+      const iE=headers.findIndex(h=>h.includes('ENTRADA'));
+      const iS=headers.findIndex(h=>h.includes('SALIDA'));
+      const iEs=headers.findIndex(h=>h.includes('ESPERADO'));
+      const iF=headers.findIndex(h=>h.includes('FISIC')||h.includes('FÍSIC'));
+      const iD=headers.findIndex(h=>h.includes('DIF'));
+      const cats=['COMIDA','CERVEZAS','BEBIDAS'];
+      let catActual='COMIDA',importados=[];
+      for(let i=headerIdx+1;i<rows.length;i++){
+        const row=rows[i];
+        const nombre=String(row[iN]||'').trim();
+        if(!nombre)continue;
+        const cat=cats.find(c=>nombre.toUpperCase().includes(c));
+        if(cat){catActual=cat;continue;}
+        importados.push({nombre,categoria:catActual,
+          invInicial:parseFloat(row[iI])||0,entradas:parseFloat(row[iE])||0,
+          salidas:parseFloat(row[iS])||0,esperado:parseFloat(row[iEs])||0,
+          fisico:parseFloat(row[iF])||0,dif:parseFloat(row[iD])||0});
+      }
+      if(!importados.length){showToast('⚠️ No se encontraron productos.','te');return;}
+      productos=importados;actualizarTodo();
+      showToast(`✅ ${productos.length} productos importados`,'tg');
+    }catch(err){showToast('❌ Error al leer el archivo.','te');console.error(err);}
+  };
+  reader.readAsBinaryString(file);e.target.value='';
+}
+
+function setTipo(t){
+  tipo=t;
+  document.getElementById('btnE').className='type-btn'+(t==='entrada'?' ae':'');
+  document.getElementById('btnS').className='type-btn'+(t==='salida'?' as':'');
+  const b=document.getElementById('btnSubmit');
+  b.textContent=t==='entrada'?'📥 Registrar Entrada':'📤 Registrar Salida';
+  b.className='btn-submit '+(t==='entrada'?'e':'s');
+}
+
+function filtrarProductos(){
+  const cat=document.getElementById('selCat').value;
+  const sel=document.getElementById('selProd');
+  const prev=sel.value;
+  const lista=cat?productos.filter(p=>p.categoria===cat):productos;
+  sel.innerHTML='<option value="">— Selecciona un producto —</option>'+
+    lista.map(p=>`<option value="${p.nombre}">${p.nombre} (Esp: ${p.esperado})</option>`).join('');
+  if(prev)sel.value=prev;
+}
+
+function registrar(){
+  const prod=document.getElementById('selProd').value;
+  const cant=parseInt(document.getElementById('inpCant').value);
+  const fisV=document.getElementById('inpFisico').value;
+  const resp=document.getElementById('inpResp').value.trim();
+  const obs=document.getElementById('inpObs').value.trim();
+  if(!prod){showToast('⚠️ Selecciona un producto','te');return;}
+  if(!cant||cant<1){showToast('⚠️ Ingresa una cantidad válida','te');return;}
+  if(!resp){showToast('⚠️ Ingresa el responsable','te');return;}
+  const idx=productos.findIndex(p=>p.nombre===prod);
+  if(idx===-1){showToast('❌ Producto no encontrado','te');return;}
+  const p=productos[idx];
+  if(tipo==='salida'&&cant>p.esperado){showToast(`❌ Stock insuficiente (${p.esperado} uds disponibles)`,'te');return;}
+  if(tipo==='entrada')p.entradas+=cant;else p.salidas+=cant;
+  p.esperado=p.invInicial+p.entradas-p.salidas;
+  if(fisV!==''){p.fisico=parseInt(fisV)||0;p.dif=p.fisico-p.esperado;}
+  const ahora=new Date();
+  const fecha=ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'})
+    +' '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  historial.unshift({fecha,tipo:tipo==='entrada'?'ENTRADA':'SALIDA',
+    categoria:p.categoria,producto:p.nombre,cantidad:cant,
+    invInicial:p.invInicial,entradas:p.entradas,salidas:p.salidas,
+    esperado:p.esperado,fisico:p.fisico,dif:p.dif,
+    responsable:resp,obs:obs||'—'});
+  actualizarTodo();
+  document.getElementById('inpCant').value='';
+  document.getElementById('inpFisico').value='';
+  document.getElementById('inpObs').value='';
+  showToast(tipo==='entrada'?`✅ Entrada: +${cant} uds → ${prod}`:`✅ Salida: -${cant} uds → ${prod}`,tipo==='entrada'?'tg':'tr');
+}
+
+function renderTable(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const cats=['COMIDA','CERVEZAS','BEBIDAS'];
+  const emoji={COMIDA:'🍖',CERVEZAS:'🍺',BEBIDAS:'🥤'};
+  const labels={COMIDA:'COMIDA',CERVEZAS:'CERVEZAS',BEBIDAS:'BEBIDAS / GASEOSAS'};
+  const cls={COMIDA:'cat-comida',CERVEZAS:'cat-cervezas',BEBIDAS:'cat-bebidas'};
+  let html='',total=0,ok=0,bajo=0,vacio=0;
+  cats.forEach(cat=>{
+    const lista=productos.filter(p=>p.categoria===cat&&(!q||p.nombre.toLowerCase().includes(q)));
+    if(!lista.length)return;
+    html+=`<tr class="cat-row ${cls[cat]}"><td colspan="8">${emoji[cat]} ${labels[cat]}</td></tr>`;
+    lista.forEach(p=>{
+      total++;
+      let badge='';
+      if(p.esperado===0){vacio++;badge='<span class="badge b-empty">Sin stock</span>';}
+      else if(p.esperado<5){bajo++;badge='<span class="badge b-low">Stock bajo</span>';}
+      else{ok++;badge='<span class="badge b-ok">Disponible</span>';}
+      const dc=p.dif<0?'color:#c0392b;font-weight:700':p.dif>0?'color:#1a8a4a;font-weight:700':'';
+      html+=`<tr><td>${p.nombre}</td><td>${p.invInicial}</td>
+        <td style="color:#1a8a4a;font-weight:600">${p.entradas}</td>
+        <td style="color:#c0392b;font-weight:600">${p.salidas}</td>
+        <td><strong>${p.esperado}</strong></td><td>${p.fisico}</td>
+        <td style="${dc}">${p.dif>0?'+':''}${p.dif}</td><td>${badge}</td></tr>`;
+    });
+  });
+  document.getElementById('invBody').innerHTML=html||'<tr class="empty-row"><td colspan="8">No se encontraron productos</td></tr>';
+  document.getElementById('sTotal').textContent=total;
+  document.getElementById('sOk').textContent=ok;
+  document.getElementById('sBajo').textContent=bajo;
+  document.getElementById('sVacio').textContent=vacio;
+}
+
+function renderHistorial(){
+  const tbody=document.getElementById('histBody');
+  if(!historial.length){tbody.innerHTML='<tr class="empty-row"><td colspan="13">Sin movimientos registrados aún</td></tr>';return;}
+  tbody.innerHTML=historial.map(h=>`<tr>
+    <td>${h.fecha}</td>
+    <td class="${h.tipo==='ENTRADA'?'t-entrada':'t-salida'}">${h.tipo==='ENTRADA'?'📥 ENTRADA':'📤 SALIDA'}</td>
+    <td>${h.categoria}</td><td>${h.producto}</td><td><strong>${h.cantidad}</strong></td>
+    <td>${h.invInicial}</td><td>${h.entradas}</td><td>${h.salidas}</td>
+    <td>${h.esperado}</td><td>${h.fisico}</td>
+    <td style="${h.dif<0?'color:#c0392b;font-weight:700':h.dif>0?'color:#1a8a4a;font-weight:700':''}">${h.dif>0?'+':''}${h.dif}</td>
+    <td>${h.responsable}</td><td>${h.obs}</td></tr>`).join('');
+}
+
+function actualizarTodo(){renderTable();renderHistorial();filtrarProductos();}
+
+function exportarExcel(){
+  const wb=XLSX.utils.book_new();
+  const cats=['COMIDA','CERVEZAS','BEBIDAS'];
+  const labels={COMIDA:'COMIDA',CERVEZAS:'CERVEZAS',BEBIDAS:'BEBIDAS / GASEOSAS'};
+  const invRows=[['PRODUCTOS','INV. INICIAL','ENTRADAS','SALIDAS','ESPERADO','FISICO','DIF']];
+  cats.forEach(cat=>{
+    invRows.push([labels[cat],'','','','','','']);
+    productos.filter(p=>p.categoria===cat).forEach(p=>{
+      invRows.push([p.nombre,p.invInicial,p.entradas,p.salidas,p.esperado,p.fisico,p.dif]);
+    });
+  });
+  const wsI=XLSX.utils.aoa_to_sheet(invRows);
+  wsI['!cols']=[{wch:35},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:8}];
+  XLSX.utils.book_append_sheet(wb,wsI,'Inventario');
+  const histRows=[['Fecha y Hora','Tipo','Categoría','Producto','Cantidad','Inv. Inicial','Entradas Acum.','Salidas Acum.','Esperado','Físico','DIF','Responsable','Observación']];
+  [...historial].reverse().forEach(h=>{
+    histRows.push([h.fecha,h.tipo,h.categoria,h.producto,h.cantidad,h.invInicial,h.entradas,h.salidas,h.esperado,h.fisico,h.dif,h.responsable,h.obs]);
+  });
+  const wsH=XLSX.utils.aoa_to_sheet(histRows);
+  wsH['!cols']=[{wch:18},{wch:10},{wch:12},{wch:30},{wch:10},{wch:12},{wch:14},{wch:13},{wch:10},{wch:8},{wch:6},{wch:20},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,wsH,'Historial de Movimientos');
+  const hoy=new Date();
+  XLSX.writeFile(wb,`Inventario_${hoy.getFullYear()}${String(hoy.getMonth()+1).padStart(2,'0')}${String(hoy.getDate()).padStart(2,'0')}.xlsx`);
+  showToast('⬇️ Excel descargado correctamente','tg');
+}
+
+let toastT;
+function showToast(msg,cls='td'){
+  clearTimeout(toastT);
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className=`toast ${cls} show`;
+  toastT=setTimeout(()=>t.className='toast',3400);
+}
+
+cargarDefecto();
+</script>
+</body>
+</html>
