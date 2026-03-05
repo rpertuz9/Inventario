@@ -83,7 +83,9 @@
     .btn-sync:hover{transform:translateY(-1px)}
     .hist-wrap{overflow-x:auto;max-height:340px;overflow-y:auto}
     .hist-wrap table thead th{position:sticky;top:0;z-index:1}
-    .t-entrada{color:#1a8a4a;font-weight:700}.t-salida{color:#c0392b;font-weight:700}
+    .t-entrada{color:#1a8a4a;font-weight:700}
+    .t-salida{color:#c0392b;font-weight:700}
+    .t-inicial{color:#8e44ad;font-weight:700}
     .empty-row td{text-align:center;padding:30px;color:#bbb;font-size:13px}
     .upload-bar{background:linear-gradient(135deg,#e8f4fd,#f0e8fd);border:2px dashed #a0b4d0;border-radius:14px;padding:20px;text-align:center;margin-bottom:22px;cursor:pointer;transition:all .2s}
     .upload-bar:hover{border-color:#0f3460;background:#e0eeff}
@@ -98,6 +100,7 @@
     .te{background:linear-gradient(135deg,#7d3c98,#9b59b6)}
     .td{background:#1a1a2e}
     .carrito-count{background:#e94560;color:#fff;border-radius:20px;padding:1px 8px;font-size:11px;font-weight:700}
+    .inv-inicial-row td{background:#f5f0ff}
   </style>
 </head>
 <body>
@@ -110,15 +113,15 @@
   </div>
   <div class="sync-status">
     <div class="sync-dot" id="syncDot"></div>
-    <span id="syncLabel">Conectado a Google Sheets</span>
+    <span id="syncLabel">Conectando...</span>
   </div>
 </header>
 
 <div class="container">
   <div class="upload-bar" onclick="document.getElementById('fileInput').click()">
     <div class="ui">📂</div>
-    <p><strong>Cargar Excel existente</strong> — Haz clic para importar tu archivo Prueba.xlsx</p>
-    <p style="font-size:11px;color:#999;margin-top:4px">La app detecta automáticamente tus columnas y categorías</p>
+    <p><strong>Cargar Excel de inventario inicial</strong> — Al importar, se sincroniza automáticamente con Google Sheets</p>
+    <p style="font-size:11px;color:#999;margin-top:4px">Columnas: PRODUCTOS · INV. INICIAL · ENTRADAS · SALIDAS · ESPERADO · FISICO · DIF</p>
   </div>
   <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="importExcel(event)"/>
 
@@ -174,7 +177,6 @@
         </div>
         <div id="carritoItems"><div class="carrito-empty">Agrega productos al carrito</div></div>
       </div>
-
       <button class="btn-submit e" id="btnSubmit" onclick="registrarTodo()" disabled>📥 Confirmar Entrada</button>
     </div>
   </div>
@@ -183,7 +185,7 @@
     <div class="hist-header">
       <h2>📜 Historial de Movimientos</h2>
       <div class="hist-actions">
-        <button class="btn-sync" onclick="cargarHistorialNube()">☁️ Cargar desde Sheets</button>
+        <button class="btn-sync" onclick="cargarDesdeSheets()">☁️ Cargar desde Sheets</button>
         <button class="btn-dl" onclick="exportarExcel()">⬇️ Descargar Excel</button>
       </div>
     </div>
@@ -203,11 +205,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const SHEET_URL = 'https://script.google.com/macros/s/AKfycbyUdZ0_YOpJJrrB_pG2WntbtqI-rUjYz71utwxTjIPPXCWdqILoSIMjvZr150zR8duZ2g/exec';
+const SHEET_URL='https://script.google.com/macros/s/AKfycbyUdZ0_YOpJJrrB_pG2WntbtqI-rUjYz71utwxTjIPPXCWdqILoSIMjvZr150zR8duZ2g/exec';
 
 let productos=[], historial=[], tipo='entrada', carrito=[];
 
-// ── SINCRONIZACIÓN ────────────────────────────────────────────────────────────
+// ── SYNC STATUS ───────────────────────────────────────────────────────────────
 function setSyncStatus(state){
   const dot=document.getElementById('syncDot');
   const label=document.getElementById('syncLabel');
@@ -216,52 +218,58 @@ function setSyncStatus(state){
   else{dot.className='sync-dot error';label.textContent='Error de conexión';}
 }
 
-async function enviarASheets(movimientos){
+// ── ENVIAR A SHEETS ───────────────────────────────────────────────────────────
+async function enviarASheets(payload){
   setSyncStatus('syncing');
   try{
     await fetch(SHEET_URL,{
       method:'POST',
       mode:'no-cors',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({movimientos})
+      body:JSON.stringify(payload)
     });
     setSyncStatus('ok');
-    showToast('☁️ Guardado en Google Sheets','tg');
+    return true;
   }catch(err){
     setSyncStatus('error');
-    showToast('⚠️ No se pudo guardar en Sheets. Los datos están en local.','te');
     console.error(err);
+    return false;
   }
 }
 
-async function cargarHistorialNube(){
+// ── CARGAR DESDE SHEETS ───────────────────────────────────────────────────────
+async function cargarDesdeSheets(){
   setSyncStatus('syncing');
-  showToast('☁️ Cargando historial desde Google Sheets...','td');
+  showToast('☁️ Cargando desde Google Sheets...','td');
   try{
     const res=await fetch(SHEET_URL+'?t='+Date.now());
     const data=await res.json();
-    if(data.status==='ok'&&data.movimientos.length>0){
+    if(data.status==='ok' && data.movimientos.length>0){
+
       historial=data.movimientos.map(m=>({
-        fecha:       m['Fecha y Hora']   ||'',
-        tipo:        m['Tipo']           ||'',
-        categoria:   m['Categoría']      ||'',
-        producto:    m['Producto']       ||'',
-        cantidad:    m['Cantidad']       ||0,
-        invInicial:  m['Inv. Inicial']   ||0,
-        entradas:    m['Entradas Acum.'] ||0,
-        salidas:     m['Salidas Acum.']  ||0,
-        esperado:    m['Esperado']       ||0,
-        fisico:      m['Físico']         ||0,
-        dif:         m['DIF']            ||0,
-        responsable: m['Responsable']    ||'',
-        obs:         m['Observación']    ||'—'
+        fecha:       String(m['Fecha y Hora']   ||''),
+        tipo:        String(m['Tipo']           ||''),
+        categoria:   String(m['Categoría']      ||''),
+        producto:    String(m['Producto']       ||''),
+        cantidad:    Number(m['Cantidad'])       ||0,
+        invInicial:  Number(m['Inv. Inicial'])   ||0,
+        entradas:    Number(m['Entradas Acum.']) ||0,
+        salidas:     Number(m['Salidas Acum.'])  ||0,
+        esperado:    Number(m['Esperado'])       ||0,
+        fisico:      Number(m['Físico'])         ||0,
+        dif:         Number(m['DIF'])            ||0,
+        responsable: String(m['Responsable']    ||''),
+        obs:         String(m['Observación']    ||'—')
       })).reverse();
+
+      // Reconstruir inventario desde historial
+      reconstruirInventario();
       renderHistorial();
       setSyncStatus('ok');
-      showToast(`✅ ${historial.length} movimientos cargados desde Sheets`,'tg');
+      showToast(`✅ ${historial.length} registros cargados desde Sheets`,'tg');
     } else {
       setSyncStatus('ok');
-      showToast('📋 No hay movimientos en Google Sheets todavía','td');
+      showToast('📋 No hay datos en Google Sheets todavía','td');
     }
   }catch(err){
     setSyncStatus('error');
@@ -270,94 +278,139 @@ async function cargarHistorialNube(){
   }
 }
 
-// ── PRODUCTOS ─────────────────────────────────────────────────────────────────
-function cargarDefecto(){
-  productos=[
-    {nombre:'Panceta - de 700 gr',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Chorizo ó longaniza',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Pan hamburguesa',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Bollos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Arepas',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Costilla de cerdo',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Lomo de cerdo',             categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Pechuga',                   categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Punta gorda - Carne',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Chinchurria',               categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Costilla para caldo',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Papa francesa salchipapa',  categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Papa francesa hamburguesa', categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Doritos pequeños',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Doritos grandes',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Huevos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Salchichas cazadoras',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Tortillas de tacos',        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'J1',                        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Pan para chuzopan',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Queso mozzarella',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Aguila light',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Aguila negra',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Club Colombia',             categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Coronita',                  categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Poker',                     categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Coca-Cola pet 400',         categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Postobon pet 400',          categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Mr Tea',                    categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Te Hatsu',                  categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Soda Hatsu',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Soda bretaña',              categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Canada Dry',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Agua',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Jugos naturales',           categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Porciones de cereza',       categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Porciones de limón',        categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Milo',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Café Americano',            categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Capuccino',                 categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-  ];
+// ── RECONSTRUIR INVENTARIO DESDE HISTORIAL ────────────────────────────────────
+function reconstruirInventario(){
+  // Tomar el último estado de cada producto desde el historial
+  const mapa={};
+  [...historial].reverse().forEach(h=>{
+    if(!mapa[h.producto]){
+      mapa[h.producto]={
+        nombre:h.producto,
+        categoria:h.categoria,
+        invInicial:Number(h.invInicial)||0,
+        entradas:Number(h.entradas)||0,
+        salidas:Number(h.salidas)||0,
+        esperado:Number(h.esperado)||0,
+        fisico:Number(h.fisico)||0,
+        dif:Number(h.dif)||0
+      };
+    }
+  });
+  if(Object.keys(mapa).length>0){
+    // Mantener orden original de productos, solo actualizar valores
+    productos.forEach((p,i)=>{
+      if(mapa[p.nombre]){
+        productos[i]={...productos[i],...mapa[p.nombre]};
+      }
+    });
+    // Agregar productos nuevos que vengan del historial y no estén en la lista
+    Object.values(mapa).forEach(p=>{
+      if(!productos.find(x=>x.nombre===p.nombre)){
+        productos.push(p);
+      }
+    });
+  }
   actualizarTodo();
 }
 
-function importExcel(e){
-  const file=e.target.files[0];if(!file)return;
+// ── IMPORTAR EXCEL ────────────────────────────────────────────────────────────
+async function importExcel(e){
+  const file=e.target.files[0]; if(!file)return;
   const reader=new FileReader();
-  reader.onload=function(ev){
+  reader.onload=async function(ev){
     try{
       const wb=XLSX.read(ev.target.result,{type:'binary'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{defval:'',header:1});
+
       let headerIdx=0;
       for(let i=0;i<Math.min(rows.length,6);i++){
         if(rows[i].map(c=>String(c).toUpperCase()).some(c=>c.includes('PRODUCT'))){headerIdx=i;break;}
       }
       const headers=rows[headerIdx].map(c=>String(c).toUpperCase().trim());
-      const iN=headers.findIndex(h=>h.includes('PRODUCT'));
-      const iI=headers.findIndex(h=>h.includes('INIC'));
-      const iE=headers.findIndex(h=>h.includes('ENTRADA'));
-      const iS=headers.findIndex(h=>h.includes('SALIDA'));
+      const iN =headers.findIndex(h=>h.includes('PRODUCT'));
+      const iI =headers.findIndex(h=>h.includes('INIC'));
+      const iE =headers.findIndex(h=>h.includes('ENTRADA'));
+      const iS =headers.findIndex(h=>h.includes('SALIDA'));
       const iEs=headers.findIndex(h=>h.includes('ESPERADO'));
-      const iF=headers.findIndex(h=>h.includes('FISIC')||h.includes('FÍSIC'));
-      const iD=headers.findIndex(h=>h.includes('DIF'));
+      const iF =headers.findIndex(h=>h.includes('FISIC')||h.includes('FÍSIC'));
+      const iD =headers.findIndex(h=>h.includes('DIF'));
+
       const cats=['COMIDA','CERVEZAS','BEBIDAS'];
-      let catActual='COMIDA',importados=[];
+      let catActual='COMIDA', importados=[];
+
       for(let i=headerIdx+1;i<rows.length;i++){
         const row=rows[i];
         const nombre=String(row[iN]||'').trim();
         if(!nombre)continue;
         const cat=cats.find(c=>nombre.toUpperCase().includes(c));
         if(cat){catActual=cat;continue;}
-        importados.push({nombre,categoria:catActual,
-          invInicial:parseFloat(row[iI])||0,entradas:parseFloat(row[iE])||0,
-          salidas:parseFloat(row[iS])||0,esperado:parseFloat(row[iEs])||0,
-          fisico:parseFloat(row[iF])||0,dif:parseFloat(row[iD])||0});
+        importados.push({
+          nombre, categoria:catActual,
+          invInicial:parseFloat(row[iI])||0,
+          entradas:  parseFloat(row[iE])||0,
+          salidas:   parseFloat(row[iS])||0,
+          esperado:  parseFloat(row[iEs])||0,
+          fisico:    parseFloat(row[iF])||0,
+          dif:       parseFloat(row[iD])||0
+        });
       }
+
       if(!importados.length){showToast('⚠️ No se encontraron productos.','te');return;}
-      productos=importados;actualizarTodo();
-      showToast(`✅ ${productos.length} productos importados`,'tg');
-    }catch(err){showToast('❌ Error al leer el archivo.','te');console.error(err);}
+
+      productos=importados;
+      actualizarTodo();
+      showToast(`📂 ${productos.length} productos importados. Sincronizando con Sheets...`,'td');
+
+      // Construir movimientos tipo INVENTARIO INICIAL para enviar a Sheets
+      const ahora=new Date();
+      const fecha=ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'})
+        +' '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+
+      const movimientos=importados.map(p=>({
+        fecha,
+        tipo:'INVENTARIO INICIAL',
+        categoria:p.categoria,
+        producto:p.nombre,
+        cantidad:p.invInicial,
+        invInicial:p.invInicial,
+        entradas:p.entradas,
+        salidas:p.salidas,
+        esperado:p.esperado,
+        fisico:p.fisico,
+        dif:p.dif,
+        responsable:'Sistema',
+        obs:'Carga de inventario inicial desde Excel'
+      }));
+
+      // Primero limpia los INVENTARIO INICIAL anteriores, luego sube los nuevos
+      const ok=await enviarASheets({
+        accion:'limpiar_inventario_inicial',
+        movimientos
+      });
+
+      if(ok){
+        // Agregar al historial local
+        const nuevos=movimientos.map(m=>({...m}));
+        // Quitar inventarios iniciales anteriores del historial local
+        historial=historial.filter(h=>h.tipo!=='INVENTARIO INICIAL');
+        historial=[...nuevos.reverse(),...historial];
+        renderHistorial();
+        showToast(`✅ Inventario inicial de ${productos.length} productos guardado en Google Sheets`,'tg');
+      } else {
+        showToast('⚠️ Importado localmente. No se pudo sincronizar con Sheets.','te');
+      }
+
+    }catch(err){
+      showToast('❌ Error al leer el archivo.','te');
+      console.error(err);
+    }
   };
-  reader.readAsBinaryString(file);e.target.value='';
+  reader.readAsBinaryString(file);
+  e.target.value='';
 }
 
+// ── TIPO ──────────────────────────────────────────────────────────────────────
 function setTipo(t){
   tipo=t; carrito=[]; renderCarrito();
   document.getElementById('btnE').className='type-btn'+(t==='entrada'?' ae':'');
@@ -376,6 +429,7 @@ function filtrarProductos(){
     lista.map(p=>`<option value="${p.nombre}">${p.nombre} (Esp: ${p.esperado})</option>`).join('');
 }
 
+// ── CARRITO ───────────────────────────────────────────────────────────────────
 function agregarAlCarrito(){
   const prod=document.getElementById('selProd').value;
   const cant=parseInt(document.getElementById('inpCant').value);
@@ -431,6 +485,7 @@ function renderCarrito(){
 function actualizarCantCarrito(i,val){const cant=parseInt(val);if(cant>0)carrito[i].cantidad=cant;}
 function eliminarDelCarrito(i){const n=carrito[i].nombre;carrito.splice(i,1);renderCarrito();showToast(`🗑️ Eliminado: ${n}`,'td');}
 
+// ── REGISTRAR TODO ────────────────────────────────────────────────────────────
 async function registrarTodo(){
   const resp=document.getElementById('inpResp').value.trim();
   if(!resp){showToast('⚠️ Ingresa el nombre del responsable','te');return;}
@@ -461,7 +516,7 @@ async function registrarTodo(){
   });
 
   if(errores.length>0){
-    showToast(`⚠️ No procesados: ${errores.join(', ')}`, 'te');
+    showToast(`⚠️ No procesados: ${errores.join(', ')}`,'te');
   } else {
     const n=movimientos.length;
     showToast(
@@ -471,12 +526,12 @@ async function registrarTodo(){
     );
   }
 
-  // Enviar a Google Sheets
-  if(movimientos.length>0) await enviarASheets(movimientos);
+  if(movimientos.length>0) await enviarASheets({movimientos});
 
   carrito=[]; renderCarrito(); actualizarTodo();
 }
 
+// ── RENDER TABLA ──────────────────────────────────────────────────────────────
 function renderTable(){
   const q=document.getElementById('searchInput').value.toLowerCase();
   const cats=['COMIDA','CERVEZAS','BEBIDAS'];
@@ -509,21 +564,31 @@ function renderTable(){
   document.getElementById('sVacio').textContent=vacio;
 }
 
+// ── RENDER HISTORIAL ──────────────────────────────────────────────────────────
 function renderHistorial(){
   const tbody=document.getElementById('histBody');
-  if(!historial.length){tbody.innerHTML='<tr class="empty-row"><td colspan="13">Sin movimientos registrados aún</td></tr>';return;}
-  tbody.innerHTML=historial.map(h=>`<tr>
-    <td>${h.fecha}</td>
-    <td class="${h.tipo==='ENTRADA'?'t-entrada':'t-salida'}">${h.tipo==='ENTRADA'?'📥 ENTRADA':'📤 SALIDA'}</td>
-    <td>${h.categoria}</td><td>${h.producto}</td><td><strong>${h.cantidad}</strong></td>
-    <td>${h.invInicial}</td><td>${h.entradas}</td><td>${h.salidas}</td>
-    <td>${h.esperado}</td><td>${h.fisico}</td>
-    <td style="${h.dif<0?'color:#c0392b;font-weight:700':h.dif>0?'color:#1a8a4a;font-weight:700':''}">${h.dif>0?'+':''}${h.dif}</td>
-    <td>${h.responsable}</td><td>${h.obs}</td></tr>`).join('');
+  if(!historial.length){
+    tbody.innerHTML='<tr class="empty-row"><td colspan="13">Sin movimientos registrados aún</td></tr>';
+    return;
+  }
+  tbody.innerHTML=historial.map(h=>{
+    let tipoClass='t-entrada', tipoLabel='📥 ENTRADA';
+    if(h.tipo==='SALIDA'){tipoClass='t-salida';tipoLabel='📤 SALIDA';}
+    else if(h.tipo==='INVENTARIO INICIAL'){tipoClass='t-inicial';tipoLabel='📋 INV. INICIAL';}
+    return `<tr class="${h.tipo==='INVENTARIO INICIAL'?'inv-inicial-row':''}">
+      <td>${h.fecha}</td>
+      <td class="${tipoClass}">${tipoLabel}</td>
+      <td>${h.categoria}</td><td>${h.producto}</td><td><strong>${h.cantidad}</strong></td>
+      <td>${h.invInicial}</td><td>${h.entradas}</td><td>${h.salidas}</td>
+      <td>${h.esperado}</td><td>${h.fisico}</td>
+      <td style="${h.dif<0?'color:#c0392b;font-weight:700':h.dif>0?'color:#1a8a4a;font-weight:700':''}">${h.dif>0?'+':''}${h.dif}</td>
+      <td>${h.responsable}</td><td>${h.obs}</td></tr>`;
+  }).join('');
 }
 
 function actualizarTodo(){renderTable();renderHistorial();filtrarProductos();}
 
+// ── EXPORTAR EXCEL ────────────────────────────────────────────────────────────
 function exportarExcel(){
   const wb=XLSX.utils.book_new();
   const cats=['COMIDA','CERVEZAS','BEBIDAS'];
@@ -538,18 +603,21 @@ function exportarExcel(){
   const wsI=XLSX.utils.aoa_to_sheet(invRows);
   wsI['!cols']=[{wch:35},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:8}];
   XLSX.utils.book_append_sheet(wb,wsI,'Inventario');
+
   const histRows=[['Fecha y Hora','Tipo','Categoría','Producto','Cantidad','Inv. Inicial','Entradas Acum.','Salidas Acum.','Esperado','Físico','DIF','Responsable','Observación']];
   [...historial].reverse().forEach(h=>{
     histRows.push([h.fecha,h.tipo,h.categoria,h.producto,h.cantidad,h.invInicial,h.entradas,h.salidas,h.esperado,h.fisico,h.dif,h.responsable,h.obs]);
   });
   const wsH=XLSX.utils.aoa_to_sheet(histRows);
-  wsH['!cols']=[{wch:18},{wch:10},{wch:12},{wch:30},{wch:10},{wch:12},{wch:14},{wch:13},{wch:10},{wch:8},{wch:6},{wch:20},{wch:30}];
+  wsH['!cols']=[{wch:18},{wch:16},{wch:12},{wch:30},{wch:10},{wch:12},{wch:14},{wch:13},{wch:10},{wch:8},{wch:6},{wch:20},{wch:30}];
   XLSX.utils.book_append_sheet(wb,wsH,'Historial de Movimientos');
+
   const hoy=new Date();
   XLSX.writeFile(wb,`Inventario_${hoy.getFullYear()}${String(hoy.getMonth()+1).padStart(2,'0')}${String(hoy.getDate()).padStart(2,'0')}.xlsx`);
   showToast('⬇️ Excel descargado correctamente','tg');
 }
 
+// ── TOAST ─────────────────────────────────────────────────────────────────────
 let toastT;
 function showToast(msg,cls='td'){
   clearTimeout(toastT);
@@ -558,9 +626,55 @@ function showToast(msg,cls='td'){
   toastT=setTimeout(()=>t.className='toast',3400);
 }
 
+// ── INICIO ────────────────────────────────────────────────────────────────────
 cargarDefecto();
-// Cargar historial de la nube al iniciar
-cargarHistorialNube();
+cargarDesdeSheets();
+
+function cargarDefecto(){
+  productos=[
+    {nombre:'Panceta - de 700 gr',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Chorizo ó longaniza',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Pan hamburguesa',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Bollos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Arepas',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Costilla de cerdo',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Lomo de cerdo',             categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Pechuga',                   categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Punta gorda - Carne',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Chinchurria',               categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Costilla para caldo',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Papa francesa salchipapa',  categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Papa francesa hamburguesa', categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Doritos pequeños',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Doritos grandes',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Huevos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Salchichas cazadoras',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Tortillas de tacos',        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'J1',                        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Pan para chuzopan',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Queso mozzarella',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Aguila light',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Aguila negra',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Club Colombia',             categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Coronita',                  categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Poker',                     categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Coca-Cola pet 400',         categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Postobon pet 400',          categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Mr Tea',                    categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Te Hatsu',                  categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Soda Hatsu',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Soda bretaña',              categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Canada Dry',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Agua',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Jugos naturales',           categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Porciones de cereza',       categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Porciones de limón',        categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Milo',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Café Americano',            categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+    {nombre:'Capuccino',                 categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
+  ];
+  actualizarTodo();
+}
 </script>
 </body>
 </html>
