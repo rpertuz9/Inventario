@@ -120,7 +120,7 @@
 <div class="container">
   <div class="upload-bar" onclick="document.getElementById('fileInput').click()">
     <div class="ui">📂</div>
-    <p><strong>Cargar Excel de inventario inicial</strong> — Al importar, se sincroniza automáticamente con Google Sheets</p>
+    <p><strong>Cargar Excel de inventario inicial</strong> — Al importar se sincroniza automáticamente con Google Sheets</p>
     <p style="font-size:11px;color:#999;margin-top:4px">Columnas: PRODUCTOS · INV. INICIAL · ENTRADAS · SALIDAS · ESPERADO · FISICO · DIF</p>
   </div>
   <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="importExcel(event)"/>
@@ -169,7 +169,6 @@
       <div class="form-group"><label>Físico actual (para DIF)</label><input type="number" id="inpFisico" placeholder="Cantidad contada físicamente" min="0"/></div>
       <div class="form-group"><label>Observación (opcional)</label><input type="text" id="inpObs" placeholder="Ej: Pedido #001, Devolución..."/></div>
       <button class="btn-add" onclick="agregarAlCarrito()">➕ Agregar al carrito</button>
-
       <div class="carrito-section">
         <div class="carrito-title">
           <span>🛒 Carrito <span class="carrito-count" id="carritoCount">0</span></span>
@@ -206,28 +205,72 @@
 
 <script>
 const SHEET_URL='https://script.google.com/macros/s/AKfycbyUdZ0_YOpJJrrB_pG2WntbtqI-rUjYz71utwxTjIPPXCWdqILoSIMjvZr150zR8duZ2g/exec';
-
 let productos=[], historial=[], tipo='entrada', carrito=[];
 
+// ── PRODUCTOS BASE ────────────────────────────────────────────────────────────
+const PRODUCTOS_BASE=[
+  {nombre:'Panceta - de 700 gr',      categoria:'COMIDA'},
+  {nombre:'Chorizo ó longaniza',       categoria:'COMIDA'},
+  {nombre:'Pan hamburguesa',           categoria:'COMIDA'},
+  {nombre:'Bollos',                    categoria:'COMIDA'},
+  {nombre:'Arepas',                    categoria:'COMIDA'},
+  {nombre:'Costilla de cerdo',         categoria:'COMIDA'},
+  {nombre:'Lomo de cerdo',             categoria:'COMIDA'},
+  {nombre:'Pechuga',                   categoria:'COMIDA'},
+  {nombre:'Punta gorda - Carne',       categoria:'COMIDA'},
+  {nombre:'Chinchurria',               categoria:'COMIDA'},
+  {nombre:'Costilla para caldo',       categoria:'COMIDA'},
+  {nombre:'Papa francesa salchipapa',  categoria:'COMIDA'},
+  {nombre:'Papa francesa hamburguesa', categoria:'COMIDA'},
+  {nombre:'Doritos pequeños',          categoria:'COMIDA'},
+  {nombre:'Doritos grandes',           categoria:'COMIDA'},
+  {nombre:'Huevos',                    categoria:'COMIDA'},
+  {nombre:'Salchichas cazadoras',      categoria:'COMIDA'},
+  {nombre:'Tortillas de tacos',        categoria:'COMIDA'},
+  {nombre:'J1',                        categoria:'COMIDA'},
+  {nombre:'Pan para chuzopan',         categoria:'COMIDA'},
+  {nombre:'Queso mozzarella',          categoria:'COMIDA'},
+  {nombre:'Aguila light',              categoria:'CERVEZAS'},
+  {nombre:'Aguila negra',              categoria:'CERVEZAS'},
+  {nombre:'Club Colombia',             categoria:'CERVEZAS'},
+  {nombre:'Coronita',                  categoria:'CERVEZAS'},
+  {nombre:'Poker',                     categoria:'CERVEZAS'},
+  {nombre:'Coca-Cola pet 400',         categoria:'BEBIDAS'},
+  {nombre:'Postobon pet 400',          categoria:'BEBIDAS'},
+  {nombre:'Mr Tea',                    categoria:'BEBIDAS'},
+  {nombre:'Te Hatsu',                  categoria:'BEBIDAS'},
+  {nombre:'Soda Hatsu',                categoria:'BEBIDAS'},
+  {nombre:'Soda bretaña',              categoria:'BEBIDAS'},
+  {nombre:'Canada Dry',                categoria:'BEBIDAS'},
+  {nombre:'Agua',                      categoria:'BEBIDAS'},
+  {nombre:'Jugos naturales',           categoria:'BEBIDAS'},
+  {nombre:'Porciones de cereza',       categoria:'BEBIDAS'},
+  {nombre:'Porciones de limón',        categoria:'BEBIDAS'},
+  {nombre:'Milo',                      categoria:'BEBIDAS'},
+  {nombre:'Café Americano',            categoria:'BEBIDAS'},
+  {nombre:'Capuccino',                 categoria:'BEBIDAS'},
+];
+
+function inicializarProductos(){
+  productos=PRODUCTOS_BASE.map(p=>({
+    ...p, invInicial:0, entradas:0, salidas:0, esperado:0, fisico:0, dif:0
+  }));
+}
+
 // ── SYNC STATUS ───────────────────────────────────────────────────────────────
-function setSyncStatus(state){
+function setSyncStatus(s){
   const dot=document.getElementById('syncDot');
-  const label=document.getElementById('syncLabel');
-  if(state==='ok'){dot.className='sync-dot';label.textContent='Conectado a Google Sheets';}
-  else if(state==='syncing'){dot.className='sync-dot syncing';label.textContent='Sincronizando...';}
-  else{dot.className='sync-dot error';label.textContent='Error de conexión';}
+  const lbl=document.getElementById('syncLabel');
+  if(s==='ok'){dot.className='sync-dot';lbl.textContent='Conectado a Google Sheets';}
+  else if(s==='syncing'){dot.className='sync-dot syncing';lbl.textContent='Sincronizando...';}
+  else{dot.className='sync-dot error';lbl.textContent='Error de conexión';}
 }
 
 // ── ENVIAR A SHEETS ───────────────────────────────────────────────────────────
 async function enviarASheets(payload){
   setSyncStatus('syncing');
   try{
-    await fetch(SHEET_URL,{
-      method:'POST',
-      mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
-    });
+    await fetch(SHEET_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     setSyncStatus('ok');
     return true;
   }catch(err){
@@ -237,7 +280,7 @@ async function enviarASheets(payload){
   }
 }
 
-// ── CARGAR DESDE SHEETS ───────────────────────────────────────────────────────
+// ── CARGAR DESDE SHEETS Y RECONSTRUIR INVENTARIO ──────────────────────────────
 async function cargarDesdeSheets(){
   setSyncStatus('syncing');
   showToast('☁️ Cargando desde Google Sheets...','td');
@@ -245,7 +288,6 @@ async function cargarDesdeSheets(){
     const res=await fetch(SHEET_URL+'?t='+Date.now());
     const data=await res.json();
     if(data.status==='ok' && data.movimientos.length>0){
-
       historial=data.movimientos.map(m=>({
         fecha:       String(m['Fecha y Hora']   ||''),
         tipo:        String(m['Tipo']           ||''),
@@ -262,14 +304,13 @@ async function cargarDesdeSheets(){
         obs:         String(m['Observación']    ||'—')
       })).reverse();
 
-      // Reconstruir inventario desde historial
-      reconstruirInventario();
+      reconstruirDesdeHistorial();
       renderHistorial();
       setSyncStatus('ok');
       showToast(`✅ ${historial.length} registros cargados desde Sheets`,'tg');
     } else {
       setSyncStatus('ok');
-      showToast('📋 No hay datos en Google Sheets todavía','td');
+      showToast('📋 Sin datos en Google Sheets todavía','td');
     }
   }catch(err){
     setSyncStatus('error');
@@ -279,37 +320,39 @@ async function cargarDesdeSheets(){
 }
 
 // ── RECONSTRUIR INVENTARIO DESDE HISTORIAL ────────────────────────────────────
-function reconstruirInventario(){
-  // Tomar el último estado de cada producto desde el historial
-  const mapa={};
-  [...historial].reverse().forEach(h=>{
-    if(!mapa[h.producto]){
-      mapa[h.producto]={
-        nombre:h.producto,
-        categoria:h.categoria,
-        invInicial:Number(h.invInicial)||0,
-        entradas:Number(h.entradas)||0,
-        salidas:Number(h.salidas)||0,
-        esperado:Number(h.esperado)||0,
-        fisico:Number(h.fisico)||0,
-        dif:Number(h.dif)||0
-      };
+// Recorre el historial cronológicamente y recalcula invInicial, entradas, salidas, esperado
+function reconstruirDesdeHistorial(){
+  // Reiniciar productos
+  inicializarProductos();
+
+  // Recorrer historial de más antiguo a más reciente
+  const cronologico=[...historial].reverse();
+
+  cronologico.forEach(h=>{
+    const idx=productos.findIndex(p=>p.nombre===h.producto);
+    if(idx===-1) return;
+    const p=productos[idx];
+
+    if(h.tipo==='INVENTARIO INICIAL'){
+      p.invInicial=Number(h.invInicial)||0;
+      p.entradas=0;
+      p.salidas=0;
+      p.esperado=p.invInicial;
+      p.fisico=Number(h.fisico)||0;
+      p.dif=Number(h.dif)||0;
+    } else if(h.tipo==='ENTRADA'){
+      p.entradas+=Number(h.cantidad)||0;
+      p.esperado=p.invInicial+p.entradas-p.salidas;
+      if(h.fisico) p.fisico=Number(h.fisico)||0;
+      p.dif=p.fisico-p.esperado;
+    } else if(h.tipo==='SALIDA'){
+      p.salidas+=Number(h.cantidad)||0;
+      p.esperado=p.invInicial+p.entradas-p.salidas;
+      if(h.fisico) p.fisico=Number(h.fisico)||0;
+      p.dif=p.fisico-p.esperado;
     }
   });
-  if(Object.keys(mapa).length>0){
-    // Mantener orden original de productos, solo actualizar valores
-    productos.forEach((p,i)=>{
-      if(mapa[p.nombre]){
-        productos[i]={...productos[i],...mapa[p.nombre]};
-      }
-    });
-    // Agregar productos nuevos que vengan del historial y no estén en la lista
-    Object.values(mapa).forEach(p=>{
-      if(!productos.find(x=>x.nombre===p.nombre)){
-        productos.push(p);
-      }
-    });
-  }
+
   actualizarTodo();
 }
 
@@ -322,7 +365,6 @@ async function importExcel(e){
       const wb=XLSX.read(ev.target.result,{type:'binary'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{defval:'',header:1});
-
       let headerIdx=0;
       for(let i=0;i<Math.min(rows.length,6);i++){
         if(rows[i].map(c=>String(c).toUpperCase()).some(c=>c.includes('PRODUCT'))){headerIdx=i;break;}
@@ -330,81 +372,62 @@ async function importExcel(e){
       const headers=rows[headerIdx].map(c=>String(c).toUpperCase().trim());
       const iN =headers.findIndex(h=>h.includes('PRODUCT'));
       const iI =headers.findIndex(h=>h.includes('INIC'));
-      const iE =headers.findIndex(h=>h.includes('ENTRADA'));
-      const iS =headers.findIndex(h=>h.includes('SALIDA'));
-      const iEs=headers.findIndex(h=>h.includes('ESPERADO'));
       const iF =headers.findIndex(h=>h.includes('FISIC')||h.includes('FÍSIC'));
       const iD =headers.findIndex(h=>h.includes('DIF'));
-
       const cats=['COMIDA','CERVEZAS','BEBIDAS'];
       let catActual='COMIDA', importados=[];
-
       for(let i=headerIdx+1;i<rows.length;i++){
         const row=rows[i];
         const nombre=String(row[iN]||'').trim();
         if(!nombre)continue;
         const cat=cats.find(c=>nombre.toUpperCase().includes(c));
         if(cat){catActual=cat;continue;}
+        const invIni=parseFloat(row[iI])||0;
         importados.push({
           nombre, categoria:catActual,
-          invInicial:parseFloat(row[iI])||0,
-          entradas:  parseFloat(row[iE])||0,
-          salidas:   parseFloat(row[iS])||0,
-          esperado:  parseFloat(row[iEs])||0,
-          fisico:    parseFloat(row[iF])||0,
-          dif:       parseFloat(row[iD])||0
+          invInicial:invIni,
+          entradas:0,
+          salidas:0,
+          esperado:invIni,   // Esperado = Inv. Inicial al cargar
+          fisico:parseFloat(row[iF])||0,
+          dif:parseFloat(row[iD])||0
         });
       }
-
       if(!importados.length){showToast('⚠️ No se encontraron productos.','te');return;}
 
-      productos=importados;
-      actualizarTodo();
-      showToast(`📂 ${productos.length} productos importados. Sincronizando con Sheets...`,'td');
+      // Actualizar productos con los del Excel
+      importados.forEach(imp=>{
+        const idx=productos.findIndex(p=>p.nombre===imp.nombre);
+        if(idx>=0) productos[idx]={...productos[idx],...imp};
+      });
 
-      // Construir movimientos tipo INVENTARIO INICIAL para enviar a Sheets
+      actualizarTodo();
+      showToast(`📂 ${importados.length} productos importados. Sincronizando...`,'td');
+
       const ahora=new Date();
       const fecha=ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'})
         +' '+ahora.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
 
       const movimientos=importados.map(p=>({
-        fecha,
-        tipo:'INVENTARIO INICIAL',
-        categoria:p.categoria,
-        producto:p.nombre,
-        cantidad:p.invInicial,
-        invInicial:p.invInicial,
-        entradas:p.entradas,
-        salidas:p.salidas,
-        esperado:p.esperado,
-        fisico:p.fisico,
-        dif:p.dif,
+        fecha, tipo:'INVENTARIO INICIAL',
+        categoria:p.categoria, producto:p.nombre,
+        cantidad:p.invInicial, invInicial:p.invInicial,
+        entradas:0, salidas:0, esperado:p.invInicial,
+        fisico:p.fisico, dif:p.dif,
         responsable:'Sistema',
         obs:'Carga de inventario inicial desde Excel'
       }));
 
-      // Primero limpia los INVENTARIO INICIAL anteriores, luego sube los nuevos
-      const ok=await enviarASheets({
-        accion:'limpiar_inventario_inicial',
-        movimientos
-      });
-
+      const ok=await enviarASheets({accion:'limpiar_inventario_inicial', movimientos});
       if(ok){
-        // Agregar al historial local
-        const nuevos=movimientos.map(m=>({...m}));
-        // Quitar inventarios iniciales anteriores del historial local
         historial=historial.filter(h=>h.tipo!=='INVENTARIO INICIAL');
-        historial=[...nuevos.reverse(),...historial];
+        historial=[...movimientos.slice().reverse(),...historial];
         renderHistorial();
-        showToast(`✅ Inventario inicial de ${productos.length} productos guardado en Google Sheets`,'tg');
+        showToast(`✅ Inventario inicial de ${importados.length} productos guardado en Sheets`,'tg');
       } else {
-        showToast('⚠️ Importado localmente. No se pudo sincronizar con Sheets.','te');
+        showToast('⚠️ Importado localmente. No se pudo sincronizar.','te');
       }
-
-    }catch(err){
-      showToast('❌ Error al leer el archivo.','te');
-      console.error(err);
-    }
+    }catch(err){showToast('❌ Error al leer el archivo.','te');console.error(err);}
   };
   reader.readAsBinaryString(file);
   e.target.value='';
@@ -440,12 +463,12 @@ function agregarAlCarrito(){
   const idx=productos.findIndex(p=>p.nombre===prod);
   if(idx===-1){showToast('❌ Producto no encontrado','te');return;}
   const p=productos[idx];
-  if(tipo==='salida'&&cant>p.esperado){showToast(`❌ Stock insuficiente (${p.esperado} uds)`,'te');return;}
-  const existing=carrito.findIndex(c=>c.nombre===prod);
-  if(existing>=0){
-    carrito[existing].cantidad=cant;
-    carrito[existing].fisico=fisV!==''?parseInt(fisV):null;
-    carrito[existing].obs=obs||'—';
+  if(tipo==='salida'&&cant>p.esperado){showToast(`❌ Stock insuficiente (${p.esperado} uds disponibles)`,'te');return;}
+  const ex=carrito.findIndex(c=>c.nombre===prod);
+  if(ex>=0){
+    carrito[ex].cantidad=cant;
+    carrito[ex].fisico=fisV!==''?parseInt(fisV):null;
+    carrito[ex].obs=obs||'—';
     showToast(`🔄 Actualizado: ${prod}`,'td');
   } else {
     carrito.push({nombre:prod,categoria:p.categoria,cantidad:cant,fisico:fisV!==''?parseInt(fisV):null,obs:obs||'—'});
@@ -461,13 +484,13 @@ function agregarAlCarrito(){
 function renderCarrito(){
   const cont=document.getElementById('carritoItems');
   const count=document.getElementById('carritoCount');
-  const btnSubmit=document.getElementById('btnSubmit');
-  const tipoLabel=document.getElementById('carritoTipo');
+  const btn=document.getElementById('btnSubmit');
+  const lbl=document.getElementById('carritoTipo');
   count.textContent=carrito.length;
-  tipoLabel.textContent=carrito.length>0?(tipo==='entrada'?'📥 ENTRADAS':'📤 SALIDAS'):'';
+  lbl.textContent=carrito.length>0?(tipo==='entrada'?'📥 ENTRADAS':'📤 SALIDAS'):'';
   if(carrito.length===0){
     cont.innerHTML='<div class="carrito-empty">Agrega productos al carrito</div>';
-    btnSubmit.disabled=true; return;
+    btn.disabled=true; return;
   }
   cont.innerHTML=carrito.map((item,i)=>`
     <div class="carrito-item ${tipo}-item">
@@ -476,20 +499,20 @@ function renderCarrito(){
         onchange="actualizarCantCarrito(${i},this.value)"/>
       <button class="ci-del" onclick="eliminarDelCarrito(${i})">✕</button>
     </div>`).join('');
-  btnSubmit.disabled=false;
-  btnSubmit.textContent=tipo==='entrada'
+  btn.disabled=false;
+  btn.textContent=tipo==='entrada'
     ?`📥 Confirmar Entrada (${carrito.length} producto${carrito.length>1?'s':''})`
     :`📤 Confirmar Salida (${carrito.length} producto${carrito.length>1?'s':''})`;
 }
 
-function actualizarCantCarrito(i,val){const cant=parseInt(val);if(cant>0)carrito[i].cantidad=cant;}
+function actualizarCantCarrito(i,val){const c=parseInt(val);if(c>0)carrito[i].cantidad=c;}
 function eliminarDelCarrito(i){const n=carrito[i].nombre;carrito.splice(i,1);renderCarrito();showToast(`🗑️ Eliminado: ${n}`,'td');}
 
 // ── REGISTRAR TODO ────────────────────────────────────────────────────────────
 async function registrarTodo(){
   const resp=document.getElementById('inpResp').value.trim();
   if(!resp){showToast('⚠️ Ingresa el nombre del responsable','te');return;}
-  if(carrito.length===0){showToast('⚠️ El carrito está vacío','te');return;}
+  if(!carrito.length){showToast('⚠️ El carrito está vacío','te');return;}
 
   const ahora=new Date();
   const fecha=ahora.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'})
@@ -501,16 +524,38 @@ async function registrarTodo(){
     const idx=productos.findIndex(p=>p.nombre===item.nombre);
     if(idx===-1){errores.push(item.nombre);return;}
     const p=productos[idx];
-    if(tipo==='salida'&&item.cantidad>p.esperado){errores.push(`${item.nombre} (sin stock)`);return;}
-    if(tipo==='entrada')p.entradas+=item.cantidad;
-    else p.salidas+=item.cantidad;
+
+    if(tipo==='salida'&&item.cantidad>p.esperado){
+      errores.push(`${item.nombre} (sin stock suficiente)`);return;
+    }
+
+    // ✅ Actualizar acumulados correctamente
+    if(tipo==='entrada') p.entradas+=item.cantidad;
+    else                 p.salidas+=item.cantidad;
+
+    // ✅ Esperado = Inv.Inicial + Entradas - Salidas
     p.esperado=p.invInicial+p.entradas-p.salidas;
-    if(item.fisico!==null){p.fisico=item.fisico;p.dif=p.fisico-p.esperado;}
-    const mov={fecha,tipo:tipo==='entrada'?'ENTRADA':'SALIDA',
-      categoria:p.categoria,producto:p.nombre,cantidad:item.cantidad,
-      invInicial:p.invInicial,entradas:p.entradas,salidas:p.salidas,
-      esperado:p.esperado,fisico:p.fisico,dif:p.dif,
-      responsable:resp,obs:item.obs};
+
+    if(item.fisico!==null){
+      p.fisico=item.fisico;
+      p.dif=p.fisico-p.esperado;
+    }
+
+    const mov={
+      fecha,
+      tipo:tipo==='entrada'?'ENTRADA':'SALIDA',
+      categoria:p.categoria,
+      producto:p.nombre,
+      cantidad:item.cantidad,
+      invInicial:p.invInicial,
+      entradas:p.entradas,       // acumulado
+      salidas:p.salidas,         // acumulado
+      esperado:p.esperado,
+      fisico:p.fisico,
+      dif:p.dif,
+      responsable:resp,
+      obs:item.obs
+    };
     movimientos.push(mov);
     historial.unshift(mov);
   });
@@ -520,14 +565,14 @@ async function registrarTodo(){
   } else {
     const n=movimientos.length;
     showToast(
-      tipo==='entrada'?`✅ Entrada: ${n} producto${n>1?'s':''} registrado${n>1?'s':''}`
-                      :`✅ Salida: ${n} producto${n>1?'s':''} registrado${n>1?'s':''}`,
+      tipo==='entrada'
+        ?`✅ Entrada: ${n} producto${n>1?'s':''} registrado${n>1?'s':''}`
+        :`✅ Salida: ${n} producto${n>1?'s':''} registrado${n>1?'s':''}`,
       tipo==='entrada'?'tg':'tr'
     );
   }
 
   if(movimientos.length>0) await enviarASheets({movimientos});
-
   carrito=[]; renderCarrito(); actualizarTodo();
 }
 
@@ -550,11 +595,15 @@ function renderTable(){
       else if(p.esperado<5){bajo++;badge='<span class="badge b-low">Stock bajo</span>';}
       else{ok++;badge='<span class="badge b-ok">Disponible</span>';}
       const dc=p.dif<0?'color:#c0392b;font-weight:700':p.dif>0?'color:#1a8a4a;font-weight:700':'';
-      html+=`<tr><td>${p.nombre}</td><td>${p.invInicial}</td>
+      html+=`<tr>
+        <td>${p.nombre}</td>
+        <td>${p.invInicial}</td>
         <td style="color:#1a8a4a;font-weight:600">${p.entradas}</td>
         <td style="color:#c0392b;font-weight:600">${p.salidas}</td>
-        <td><strong>${p.esperado}</strong></td><td>${p.fisico}</td>
-        <td style="${dc}">${p.dif>0?'+':''}${p.dif}</td><td>${badge}</td></tr>`;
+        <td><strong>${p.esperado}</strong></td>
+        <td>${p.fisico}</td>
+        <td style="${dc}">${p.dif>0?'+':''}${p.dif}</td>
+        <td>${badge}</td></tr>`;
     });
   });
   document.getElementById('invBody').innerHTML=html||'<tr class="empty-row"><td colspan="8">No se encontraron productos</td></tr>';
@@ -572,15 +621,14 @@ function renderHistorial(){
     return;
   }
   tbody.innerHTML=historial.map(h=>{
-    let tipoClass='t-entrada', tipoLabel='📥 ENTRADA';
-    if(h.tipo==='SALIDA'){tipoClass='t-salida';tipoLabel='📤 SALIDA';}
-    else if(h.tipo==='INVENTARIO INICIAL'){tipoClass='t-inicial';tipoLabel='📋 INV. INICIAL';}
+    let tc='t-entrada',tl='📥 ENTRADA';
+    if(h.tipo==='SALIDA'){tc='t-salida';tl='📤 SALIDA';}
+    else if(h.tipo==='INVENTARIO INICIAL'){tc='t-inicial';tl='📋 INV. INICIAL';}
     return `<tr class="${h.tipo==='INVENTARIO INICIAL'?'inv-inicial-row':''}">
-      <td>${h.fecha}</td>
-      <td class="${tipoClass}">${tipoLabel}</td>
+      <td>${h.fecha}</td><td class="${tc}">${tl}</td>
       <td>${h.categoria}</td><td>${h.producto}</td><td><strong>${h.cantidad}</strong></td>
       <td>${h.invInicial}</td><td>${h.entradas}</td><td>${h.salidas}</td>
-      <td>${h.esperado}</td><td>${h.fisico}</td>
+      <td><strong>${h.esperado}</strong></td><td>${h.fisico}</td>
       <td style="${h.dif<0?'color:#c0392b;font-weight:700':h.dif>0?'color:#1a8a4a;font-weight:700':''}">${h.dif>0?'+':''}${h.dif}</td>
       <td>${h.responsable}</td><td>${h.obs}</td></tr>`;
   }).join('');
@@ -603,7 +651,6 @@ function exportarExcel(){
   const wsI=XLSX.utils.aoa_to_sheet(invRows);
   wsI['!cols']=[{wch:35},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:8}];
   XLSX.utils.book_append_sheet(wb,wsI,'Inventario');
-
   const histRows=[['Fecha y Hora','Tipo','Categoría','Producto','Cantidad','Inv. Inicial','Entradas Acum.','Salidas Acum.','Esperado','Físico','DIF','Responsable','Observación']];
   [...historial].reverse().forEach(h=>{
     histRows.push([h.fecha,h.tipo,h.categoria,h.producto,h.cantidad,h.invInicial,h.entradas,h.salidas,h.esperado,h.fisico,h.dif,h.responsable,h.obs]);
@@ -611,7 +658,6 @@ function exportarExcel(){
   const wsH=XLSX.utils.aoa_to_sheet(histRows);
   wsH['!cols']=[{wch:18},{wch:16},{wch:12},{wch:30},{wch:10},{wch:12},{wch:14},{wch:13},{wch:10},{wch:8},{wch:6},{wch:20},{wch:30}];
   XLSX.utils.book_append_sheet(wb,wsH,'Historial de Movimientos');
-
   const hoy=new Date();
   XLSX.writeFile(wb,`Inventario_${hoy.getFullYear()}${String(hoy.getMonth()+1).padStart(2,'0')}${String(hoy.getDate()).padStart(2,'0')}.xlsx`);
   showToast('⬇️ Excel descargado correctamente','tg');
@@ -627,54 +673,9 @@ function showToast(msg,cls='td'){
 }
 
 // ── INICIO ────────────────────────────────────────────────────────────────────
-cargarDefecto();
+inicializarProductos();
+actualizarTodo();
 cargarDesdeSheets();
-
-function cargarDefecto(){
-  productos=[
-    {nombre:'Panceta - de 700 gr',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Chorizo ó longaniza',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Pan hamburguesa',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Bollos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Arepas',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Costilla de cerdo',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Lomo de cerdo',             categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Pechuga',                   categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Punta gorda - Carne',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Chinchurria',               categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Costilla para caldo',       categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Papa francesa salchipapa',  categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Papa francesa hamburguesa', categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Doritos pequeños',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Doritos grandes',           categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Huevos',                    categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Salchichas cazadoras',      categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Tortillas de tacos',        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'J1',                        categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Pan para chuzopan',         categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Queso mozzarella',          categoria:'COMIDA',   invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Aguila light',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Aguila negra',              categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Club Colombia',             categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Coronita',                  categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Poker',                     categoria:'CERVEZAS', invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Coca-Cola pet 400',         categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Postobon pet 400',          categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Mr Tea',                    categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Te Hatsu',                  categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Soda Hatsu',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Soda bretaña',              categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Canada Dry',                categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Agua',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Jugos naturales',           categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Porciones de cereza',       categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Porciones de limón',        categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Milo',                      categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Café Americano',            categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-    {nombre:'Capuccino',                 categoria:'BEBIDAS',  invInicial:0,entradas:0,salidas:0,esperado:0,fisico:0,dif:0},
-  ];
-  actualizarTodo();
-}
 </script>
 </body>
 </html>
